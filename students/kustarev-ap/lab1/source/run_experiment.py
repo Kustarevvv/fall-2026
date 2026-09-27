@@ -6,7 +6,10 @@ import matplotlib.pyplot as plt
 from sklearn.dummy import DummyClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.decomposition import PCA
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
+from sklearn.metrics import (
+    accuracy_score, precision_score, recall_score, f1_score, roc_auc_score,
+    roc_curve, ConfusionMatrixDisplay,
+)
 
 from data import load_dataset, load_raw, TARGET_COL, HIGH_RISK_CATEGORIES
 from linear_classifier import LinearClassifier, margin, loss, loss_grad
@@ -270,4 +273,31 @@ final_results = {
 
 print(f"Лучший собственный режим: {best_mode_name}")
 print(results_table(final_results))
+
+best_clf = modes[best_mode_name]
+best_scores = best_clf.decision_function(X_test)
+best_pred01 = pm1_to_01(best_clf.predict(X_test))
+log_scores = logreg.predict_proba(X_test)[:, 1]
+
+fpr_best, tpr_best, _ = roc_curve(y01_test, best_scores)
+fpr_log, tpr_log, _ = roc_curve(y01_test, log_scores)
+
+plt.figure(figsize=(6, 6))
+plt.plot(fpr_best, tpr_best, label=f"{best_mode_name}, AUC={roc_auc_score(y01_test, best_scores):.3f}")
+plt.plot(fpr_log, tpr_log, label=f"LogisticRegression, AUC={roc_auc_score(y01_test, log_scores):.3f}")
+plt.plot([0, 1], [0, 1], ls="--", color="gray")
+plt.xlabel("False Positive Rate")
+plt.ylabel("True Positive Rate")
+plt.title("ROC-кривая: лучший режим против эталона")
+plt.legend()
+savefig("07_roc_curve.png")
+
+fig, ax = plt.subplots(figsize=(5, 5))
+ConfusionMatrixDisplay.from_predictions(
+    y01_test, best_pred01, display_labels=["низкий риск", "повышенный риск"],
+    cmap="Blues", colorbar=False, ax=ax,
+)
+ax.set_title(f"Матрица ошибок: режим {best_mode_name.split()[0]}")
+savefig("08_confusion_matrix.png")
+
 print(f"Графики сохранены в {PLOTS_DIR}")
