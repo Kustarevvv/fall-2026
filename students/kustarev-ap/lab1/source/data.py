@@ -42,6 +42,12 @@ ALL_FEATURES = NUMERIC_FEATURES + CATEGORICAL_FEATURES
 
 
 def load_raw(path=DEFAULT_DATA_PATH):
+    path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(
+            f"Датасет не найден: {path}. Скачать 'E-commerce Customer Segmentation 2026' "
+            "с Kaggle и положить CSV в lab1/data/."
+        )
     return pd.read_csv(path)
 
 
