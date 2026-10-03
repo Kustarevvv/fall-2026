@@ -133,6 +133,8 @@ for name, clf in [("0.0", clf_l2_0), ("5.0", clf_l2_big)]:
 
 common = dict(init="correlation", sampling_strategy="uniform", gamma=0.9, l2_lambda=1e-2,
               max_iter=20000, random_state=42)
+# eta* выводится из полного градиента (loss + L2): eta*=||g||^2/(g^T H g),
+# поэтому корректно работает вместе с регуляризацией
 
 clf_fixed = LinearClassifier(step_strategy="fixed", eta=0.005, **common)
 clf_fixed.fit(X_train, y_train)
@@ -142,7 +144,7 @@ clf_steep.fit(X_train, y_train)
 
 plt.figure(figsize=(7, 4))
 plt.plot(clf_fixed.history_.Q, label="fixed, eta=0.005")
-plt.plot(clf_steep.history_.Q, label="steepest, eta*=1/(2*norm(x)^2)")
+plt.plot(clf_steep.history_.Q, label="steepest, eta*=||g||^2/(g^T H g)")
 plt.yscale("log")
 plt.xlabel("итерация SGD"); plt.ylabel("Q")
 plt.title("Сходимость: fixed vs steepest")
@@ -158,12 +160,12 @@ print(results_table(res_step))
 n = X_train.shape[0]
 X_aug = np.hstack([X_train, np.ones((n, 1))])
 x_i = X_aug[0]
-eta_star = LinearClassifier.steepest_eta(x_i)
 w0 = np.zeros(x_i.shape[0])
 grad0 = loss_grad(w0, x_i, y_train[0])
+eta_star = LinearClassifier.steepest_eta(x_i, grad0, l2_lambda=0.0)
 w1 = w0 - eta_star * grad0
 M1 = y_train[0] * (x_i @ w1)
-print(f"eta* = {eta_star:.5f}, отступ после шага M1 = {M1:.6f} (должен быть ~1.0)")
+print(f"eta* (l2=0) = {eta_star:.5f}, отступ после шага M1 = {M1:.6f} (должен быть ~1.0)")
 
 # Этап 7. Предъявление объектов по модулю отступа (п.8)
 

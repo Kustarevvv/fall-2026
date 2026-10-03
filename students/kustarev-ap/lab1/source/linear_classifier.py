@@ -88,8 +88,12 @@ class LinearClassifier:
         return np.sign(self.decision_function(X)).astype(float)
 
     @staticmethod
-    def steepest_eta(x_i, eps=1e-12):
-        return 1.0 / (2.0 * (x_i @ x_i) + eps)
+    def steepest_eta(x_i, grad, l2_lambda, eps=1e-12):
+        # eta* = ||g||^2 / (g^T H g), H -- гессиан (1-M)^2 + l2*||w||^2 вдоль grad,
+        # при l2_lambda=0 сводится к 1/(2*||x_i||^2)
+        xg = x_i @ grad
+        den = 2.0 * (xg ** 2 + l2_lambda * (grad[:-1] @ grad[:-1]))
+        return float(grad @ grad) / den if den > eps else 0.0
 
     def _fit_single_run(self, X, y, w0, rng):
         n = X.shape[0]
@@ -123,7 +127,7 @@ class LinearClassifier:
             y_i = y[i]
 
             grad = loss_grad(w, x_i, y_i) + 2.0 * self.l2_lambda * w * reg_mask
-            eta_t = self.steepest_eta(x_i) if self.step_strategy == "steepest" else self.eta
+            eta_t = self.steepest_eta(x_i, grad, self.l2_lambda) if self.step_strategy == "steepest" else self.eta
 
             v = self.gamma * v + (1.0 - self.gamma) * grad
             w = w - eta_t * v
