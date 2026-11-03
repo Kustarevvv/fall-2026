@@ -129,7 +129,7 @@ class LinearClassifier:
             grad = loss_grad(w, x_i, y_i) + 2.0 * self.l2_lambda * w * reg_mask
             eta_t = self.steepest_eta(x_i, grad, self.l2_lambda) if self.step_strategy == "steepest" else self.eta
 
-            v = self.gamma * v + (1.0 - self.gamma) * grad
+            v = grad if self.step_strategy == "steepest" else self.gamma * v + (1.0 - self.gamma) * grad
             w = w - eta_t * v
 
             M_i = y_i * (x_i @ w)

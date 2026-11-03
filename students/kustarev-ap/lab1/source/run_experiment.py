@@ -44,9 +44,10 @@ ax.set_title("churn_risk_category (красный = повышенный рис�
 plt.xticks(rotation=20)
 savefig("00_target_distribution.png")
 
-X_train, X_test, y_train, y_test, preprocessor = load_dataset()
-print(f"X_train: {X_train.shape}, X_test: {X_test.shape}")
-print(f"Доля класса 1 (высокий риск) train: {(y_train == 1).mean():.3f}, test: {(y_test == 1).mean():.3f}")
+X_train, X_test, y_train, y_test, preprocessor, X_val, y_val = load_dataset()
+# All exploratory comparisons use validation.
+print(f"X_train: {X_train.shape}, X_val: {X_val.shape}")
+print(f"Доля класса 1 (высокий риск) train: {(y_train == 1).mean():.3f}, test: {(y_val == 1).mean():.3f}")
 print(f"Число признаков после OneHot/StandardScaler: {X_train.shape[1]}")
 
 # PCA-проекция классов
@@ -123,10 +124,10 @@ axes[1].set_title("Сходимость Q")
 axes[1].set_xlabel("итерация SGD"); axes[1].legend()
 savefig("03_l2_effect.png")
 
-print(f"{'l2_lambda':>10} | {'norm(w)':>8} | {'train loss':>11} | {'test loss':>10}")
+print(f"{'l2_lambda':>10} | {'norm(w)':>8} | {'train loss':>11} | {'validation loss':>10}")
 for name, clf in [("0.0", clf_l2_0), ("5.0", clf_l2_big)]:
     M_tr = clf.margin(X_train, y_train)
-    M_te = clf.margin(X_test, y_test)
+    M_te = clf.margin(X_val, y_val)
     print(f"{name:>10} | {np.linalg.norm(clf.w_):8.3f} | {loss(M_tr).mean():11.4f} | {loss(M_te).mean():10.4f}")
 
 # Этап 6. Скорейший градиентный спуск (п.7)
@@ -152,8 +153,8 @@ plt.legend()
 savefig("04_fixed_vs_steepest.png")
 
 res_step = {
-    "fixed": evaluate_classifier(clf_fixed, X_test, y_test),
-    "steepest": evaluate_classifier(clf_steep, X_test, y_test),
+    "fixed": evaluate_classifier(clf_fixed, X_val, y_val),
+    "steepest": evaluate_classifier(clf_steep, X_val, y_val),
 }
 print(results_table(res_step))
 
@@ -188,8 +189,8 @@ plt.legend()
 savefig("05_uniform_vs_margin.png")
 
 res_sampling = {
-    "uniform": evaluate_classifier(clf_unif, X_test, y_test),
-    "margin": evaluate_classifier(clf_marg, X_test, y_test),
+    "uniform": evaluate_classifier(clf_unif, X_val, y_val),
+    "margin": evaluate_classifier(clf_marg, X_val, y_val),
 }
 print(results_table(res_sampling))
 
@@ -224,12 +225,12 @@ for name, clf in modes.items():
 # Этап 9. Оценка качества (п.10)
 
 train_res = {name: evaluate_classifier(clf, X_train, y_train) for name, clf in modes.items()}
-test_res = {name: evaluate_classifier(clf, X_test, y_test) for name, clf in modes.items()}
+val_res = {name: evaluate_classifier(clf, X_val, y_val) for name, clf in modes.items()}
 
 print("=== TRAIN ===")
 print(results_table(train_res))
-print("=== TEST ===")
-print(results_table(test_res))
+print("=== VALIDATION ===")
+print(results_table(val_res))
 
 fig, ax = plt.subplots(figsize=(8, 5))
 for name, clf in modes.items():
@@ -244,7 +245,6 @@ savefig("06_three_modes_convergence.png")
 # Этап 10. Сравнение с эталоном (п.11)
 
 y01_train = pm1_to_01(y_train)
-y01_test = pm1_to_01(y_test)
 
 dummy = DummyClassifier(strategy="most_frequent", random_state=42)
 dummy.fit(X_train, y01_train)
@@ -265,16 +265,17 @@ def eval_sklearn(model, X, y01):
     }
 
 
-best_mode_name = max(test_res, key=lambda k: test_res[k]["roc_auc"])
+best_mode_name = max(val_res, key=lambda k: val_res[k]["roc_auc"])
+y01_test = pm1_to_01(y_test)
 
 final_results = {
     "DummyClassifier": eval_sklearn(dummy, X_test, y01_test),
     "LogisticRegression (эталон)": eval_sklearn(logreg, X_test, y01_test),
-    **{f"LinearClassifier: {name}": res for name, res in test_res.items()},
+    f"LinearClassifier: {best_mode_name}": evaluate_classifier(modes[best_mode_name], X_test, y_test),
 }
 
 print(f"Лучший собственный режим: {best_mode_name}")
-print(results_table(final_results))
+print(results_table(final_results).to_string())
 
 best_clf = modes[best_mode_name]
 best_scores = best_clf.decision_function(X_test)

@@ -44,10 +44,23 @@ ALL_FEATURES = NUMERIC_FEATURES + CATEGORICAL_FEATURES
 def load_raw(path=DEFAULT_DATA_PATH):
     path = Path(path)
     if not path.exists():
-        raise FileNotFoundError(
-            f"Датасет не найден: {path}. Скачать 'E-commerce Customer Segmentation 2026' "
-            "с Kaggle и положить CSV в lab1/data/."
-        )
+        if path != DEFAULT_DATA_PATH:
+            raise FileNotFoundError(path)
+        from urllib.request import urlopen
+        from zipfile import ZipFile
+        from io import BytesIO
+        url = "https://www.kaggle.com/api/v1/datasets/download/datascikhan/e-commerce-customer-segmentation-2026"
+        try:
+            with urlopen(url, timeout=120) as response:
+                archive = ZipFile(BytesIO(response.read()))
+            matches = [n for n in archive.namelist() if Path(n).name == path.name]
+            if len(matches) != 1:
+                raise ValueError("Expected CSV missing from Kaggle archive")
+            content = archive.read(matches[0])
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content)
+        except Exception as exc:
+            raise RuntimeError(f"Download failed: {url}. Download CSV manually to {path}") from exc
     return pd.read_csv(path)
 
 
@@ -70,6 +83,10 @@ def load_dataset(path=DEFAULT_DATA_PATH, test_size=0.2, random_state=42):
         X, y01, test_size=test_size, stratify=y01, random_state=random_state
     )
 
+    X_train_df, X_val_df, y01_train, y01_val = train_test_split(
+        X_train_df, y01_train, test_size=0.25, stratify=y01_train, random_state=random_state
+    )
+
     preprocessor = ColumnTransformer([
         ("num", StandardScaler(), NUMERIC_FEATURES),
         ("cat", OneHotEncoder(handle_unknown="ignore", sparse_output=False), CATEGORICAL_FEATURES),
@@ -83,4 +100,4 @@ def load_dataset(path=DEFAULT_DATA_PATH, test_size=0.2, random_state=42):
     y_train = np.where(y01_train == 1, 1.0, -1.0)
     y_test = np.where(y01_test == 1, 1.0, -1.0)
 
-    return X_train, X_test, y_train, y_test, preprocessor
+    return X_train, X_test, y_train, y_test, preprocessor, np.asarray(preprocessor.transform(X_val_df), dtype=np.float64), np.where(y01_val == 1, 1.0, -1.0)
