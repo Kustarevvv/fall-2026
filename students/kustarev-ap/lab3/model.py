@@ -237,7 +237,8 @@ plot_confusion(y_test, y_pred_rbf, titles["rbf"], "11_confusion_matrix_rbf.png")
 
 sklearn_params = {
     "linear": dict(kernel="linear", C=best_linear["C"]),
-    "poly": dict(kernel="poly", C=best_poly["C"], degree=best_poly["degree"], coef0=best_poly["coef0"]),
+    # kernels.polynomial uses (X @ Z.T + coef0) ** degree, hence gamma=1.
+    "poly": dict(kernel="poly", gamma=1.0, C=best_poly["C"], degree=best_poly["degree"], coef0=best_poly["coef0"]),
     "rbf": dict(kernel="rbf", C=best_rbf["C"], gamma=best_rbf["gamma"]),
 }
 
